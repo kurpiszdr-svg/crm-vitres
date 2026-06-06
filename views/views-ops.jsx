@@ -428,6 +428,7 @@ function QuotesView({ nav }) {
     q.status = "accepte";
     setStatuses(prev => ({...prev, [q.id]:"accepte"}));
     setOpenDoc(null);
+    if (window.CRM.save) window.CRM.save();
   };
 
   const markSent = (q) => {
@@ -435,6 +436,7 @@ function QuotesView({ nav }) {
     setStatuses(prev => ({...prev, [q.id]:"envoye"}));
     setSendDoc(null);
     setOpenDoc(null);
+    if (window.CRM.save) window.CRM.save();
   };
 
   // Devis qui ont déjà une intervention planifiée
@@ -554,6 +556,7 @@ function InvoicesView({ nav }) {
     f.status = "envoyee";
     setSendDoc(null);
     setOpenDoc(null);
+    if (window.CRM.save) window.CRM.save();
     forceUpdate();
   };
 
@@ -566,6 +569,7 @@ function InvoicesView({ nav }) {
     if (paid >= total) { payModal.status = "payee"; payModal.paidDate = payDate; }
     setPayModal(null);
     setOpenDoc(null);
+    if (window.CRM.save) window.CRM.save();
     forceUpdate();
   };
 
@@ -600,7 +604,7 @@ function InvoicesView({ nav }) {
       ) : (
       <>
       <div className="pills" style={{ marginBottom: 16 }}>
-        {[["tous", "Toutes"], ["brouillon", "Créé"], ["envoyee", "Envoyées"], ["en_retard", "En retard"], ["payee", "Payées"]].map(([k, l]) => (
+        {[["tous", "En cours"], ["brouillon", "Créé"], ["envoyee", "Envoyées"], ["en_retard", "En retard"], ["payee", "Payées"]].map(([k, l]) => (
           <button key={k} className={`pill ${filter === k ? "active" : ""}`} onClick={() => setFilter(k)}>{l}</button>
         ))}
       </div>

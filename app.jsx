@@ -73,6 +73,26 @@ function App() {
     root.style.setProperty("--density", t.density === "compact" ? 0.8 : t.density === "comfy" ? 1.25 : 1);
   }, [t.theme, t.font, t.accent, t.density]);
 
+  // Accessibilité : relie chaque <label> de .field à son champ via aria-label,
+  // puisque le markup utilise des <label> visuels non associés (sans for/id).
+  // Un MutationObserver garantit que tout champ ajouté est traité, quel que soit le timing de rendu.
+  React.useEffect(() => {
+    const link = () => {
+      document.querySelectorAll(".field").forEach((f) => {
+        const label = f.querySelector(":scope > label");
+        const ctrl = f.querySelector("input, select, textarea");
+        if (label && ctrl && !ctrl.getAttribute("aria-label")) {
+          const txt = label.textContent.trim();
+          if (txt) ctrl.setAttribute("aria-label", txt);
+        }
+      });
+    };
+    link();
+    const obs = new MutationObserver(() => link());
+    obs.observe(document.body, { childList: true, subtree: true });
+    return () => obs.disconnect();
+  }, []);
+
   const renderView = () => {
     switch (route.view) {
       case "maJournee": return <MaJourneeView nav={nav} />;
@@ -113,16 +133,16 @@ function App() {
 
         <nav className="appnav-nav">
           {NAV.map((n) => (
-            <a key={n.key} className={`appnav-item ${activeNav === n.key ? "active" : ""}`} onClick={() => nav(n.key)}>
+            <button type="button" key={n.key} className={`appnav-item ${activeNav === n.key ? "active" : ""}`} onClick={() => nav(n.key)} aria-current={activeNav === n.key ? "page" : undefined}>
               <span>{n.key === "dashboard" ? "Accueil" : n.label}</span>
               {n.key === "invoices" && overdueCount > 0 && <span className="appnav-count">{overdueCount}</span>}
-            </a>
+            </button>
           ))}
         </nav>
 
         <div className="appnav-actions">
-          <button className="btn btn-outline btn-sm" title="Rechercher"><Icon name="search" size={15} /><span className="hide-narrow">Rechercher</span></button>
-          <button className="icon-btn" onClick={() => nav("reminders")} title="Notifications">
+          <button className="btn btn-outline btn-sm" title="Rechercher" aria-label="Rechercher"><Icon name="search" size={15} /><span className="hide-narrow">Rechercher</span></button>
+          <button className="icon-btn" onClick={() => nav("reminders")} title="Notifications" aria-label="Notifications">
             <Icon name="reminders" size={18} />
             {overdueCount > 0 && <span className="ib-dot" />}
           </button>
@@ -135,7 +155,7 @@ function App() {
         <BrandMark size={34} iconSize={18} />
         <div className="mt-title">{title}</div>
         <div className="spacer" />
-        <button className="icon-btn" onClick={() => nav("reminders")}>
+        <button className="icon-btn" onClick={() => nav("reminders")} aria-label="Notifications">
           <Icon name="reminders" size={18} />
           {overdueCount > 0 && <span className="ib-dot" />}
         </button>

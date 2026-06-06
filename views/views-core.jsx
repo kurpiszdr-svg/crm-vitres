@@ -30,6 +30,16 @@ function DashboardView({ nav }) {
   const outstandingTotal = outstanding.reduce((s, f) => s + invoiceTotal(f) - invoicePaid(f), 0);
   const overdue = invoices.filter((f) => f.status === "en_retard");
   const pendingQuotes = quotes.filter((q) => q.status === "envoye");
+
+  // ── Valeurs dynamiques de l'en-tête (plus aucune donnée figée) ──
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const todayLabel = cap(new Date(today + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }));
+  const interventionsToday = todayAppts.filter((a) => a.rdvType === "intervention");
+  const dayRange = todayAppts.length ? `${todayAppts[0].start} → ${todayAppts[todayAppts.length - 1].end}` : "Aucun RDV";
+  const ym = today.slice(0, 7);
+  const monthName = new Date(today + "T00:00:00").toLocaleDateString("fr-FR", { month: "long" });
+  const caMonthDyn = invoices.filter((f) => f.status === "payee" && f.paidDate && f.paidDate.startsWith(ym)).reduce((s, f) => s + invoicePaid(f), 0);
+  const caMonthCount = invoices.filter((f) => f.status === "payee" && f.paidDate && f.paidDate.startsWith(ym)).length;
   const scheduledIds = new Set(appointments.filter(a => a.linkedQuoteId).map(a => a.linkedQuoteId));
   const devisAProg = quotes.filter(q => q.status === "accepte" && !scheduledIds.has(q.id));
   // Interventions réalisées (terminées) sans facture émise → à facturer
@@ -64,7 +74,7 @@ function DashboardView({ nav }) {
       <div className="dash-hero">
         <div>
           <p className="dash-greet">Bonjour Julien 👋</p>
-          <h1 className="dash-title">Mardi 3 juin — 3 interventions prévues</h1>
+          <h1 className="dash-title">{todayLabel} — {todayAppts.length} rendez-vous prévu{todayAppts.length > 1 ? "s" : ""}</h1>
         </div>
         <Button variant="outline" size="sm" icon="plus" onClick={() => nav("apptNew")}>Nouveau RDV</Button>
       </div>
@@ -72,9 +82,9 @@ function DashboardView({ nav }) {
 
 
       <div className="grid grid-4 stats-grid" style={{ marginTop: 22 }}>
-        <Stat label="CA du mois (mai)" value={eur(caMonth)} delta="▲ 16 % vs avril" deltaTone="up" icon="euro" />
-        <Stat label="En attente de paiement" value={eur(outstandingTotal)} delta={`${outstanding.length} factures`} deltaTone="neutral" icon="invoices" />
-        <Stat label="RDV aujourd'hui" value={todayAppts.length} delta="07:30 → 12:00" deltaTone="neutral" icon="calendar" />
+        <Stat label={`CA du mois (${monthName})`} value={eur(caMonthDyn)} delta={caMonthCount > 0 ? `${caMonthCount} facture${caMonthCount > 1 ? "s" : ""} réglée${caMonthCount > 1 ? "s" : ""}` : "encaissé ce mois"} deltaTone={caMonthCount > 0 ? "up" : "neutral"} icon="euro" />
+        <Stat label="En attente de paiement" value={eur(outstandingTotal)} delta={`${outstanding.length} facture${outstanding.length > 1 ? "s" : ""}`} deltaTone="neutral" icon="invoices" />
+        <Stat label="RDV aujourd'hui" value={todayAppts.length} delta={dayRange} deltaTone="neutral" icon="calendar" />
         <Stat label="Devis en cours" value={pendingQuotes.length} delta={eur(pendingQuotes.reduce((s, q) => s + quoteTotal(q), 0))} deltaTone="neutral" icon="quotes" />
       </div>
 
@@ -214,7 +224,8 @@ function ClientsView({ nav }) {
             <tbody>
               {filtered.map((c) => {
                 const lv = lastVisit(c.id);
-                const rhythm = c.tags.find((t) => ["mensuel", "trimestriel", "semestriel", "bimestriel", "ponctuel"].includes(t)) || "—";
+                // Rythme = le 1er tag qui n'est pas « pro » (robuste : couvre hebdomadaire + rythmes personnalisés)
+                const rhythm = (c.tags || []).find((t) => t !== "pro") || "—";
                 return (
                   <tr key={c.id} className="clickable" onClick={() => nav("clientDetail", { id: c.id })}>
                     <td>
@@ -234,7 +245,7 @@ function ClientsView({ nav }) {
                     <td className="num">
                       <button style={{ fontSize: 20, lineHeight: 1, padding: "4px 8px", background: "none", border: "none", cursor: "pointer", color: "var(--muted)", borderRadius: 8 }}
                         title="Supprimer"
-                        onClick={(e) => { e.stopPropagation(); if (window.confirm(`Supprimer ${c.name} ?`)) { window.CRM.clients.splice(window.CRM.clients.findIndex(x=>x.id===c.id),1); setFilter(f=>f); } }}>
+                        onClick={(e) => { e.stopPropagation(); if (window.confirm(`Supprimer ${c.name} ?`)) { window.CRM.clients.splice(window.CRM.clients.findIndex(x=>x.id===c.id),1); if (window.CRM.save) window.CRM.save(); setFilter(f=>f); } }}>
                         🗑️
                       </button>
                     </td>
@@ -725,6 +736,7 @@ function MaJourneeView({ nav }) {
     setStatuses(prev => ({...prev, [id]: s}));
     const a = appointments.find(x => x.id === id);
     if (a) a.status = s;
+    if (window.CRM.save) window.CRM.save();
   };
 
   const nonVal = todayAppts.filter(a => getStatus(a.id) !== "termine" && getStatus(a.id) !== "annule");

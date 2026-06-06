@@ -823,8 +823,8 @@ function ApptDetailView({ nav, params }) {
   const COLORS = { planifie: "var(--water)", termine: "var(--success)", annule: "var(--danger)" };
   const RDV_TYPE_LABEL = { devis: "📋 Devis", intervention: "🪣 Intervention", appel: "📞 Appel téléphonique", autre: "🗓 Autre" };
 
-  const validate = () => {setStatus("termine");a.status = "termine";};
-  const cancel = () => {setStatus("annule");a.status = "annule";};
+  const validate = () => {setStatus("termine");a.status = "termine"; if (window.CRM.save) window.CRM.save();};
+  const cancel = () => {setStatus("annule");a.status = "annule"; if (window.CRM.save) window.CRM.save();};
 
   return (
     <div className="view content-narrow">

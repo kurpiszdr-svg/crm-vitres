@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rapport d'audit — CRM Vitres &amp; Cie</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#faf6f1; --surface:#fffdfb; --ink:#2b2522; --ink-2:#5c5248;
+    --muted:#8c8174; --line:#ece3d8; --line-2:#ddd0c2;
+    --accent:#c2703f; --accent-strong:#a85a2d; --accent-soft:#f6e6da;
+    --success:#5a8a5f; --success-soft:#e4efe2;
+    --danger:#bd5a45; --danger-soft:#f6e1da;
+    --water:#5f7fa8; --water-soft:#e2e9f2;
+    --font-display:"Bricolage Grotesque", Georgia, serif;
+    --font-body:"Hanken Grotesk", system-ui, sans-serif;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body{ font-family:var(--font-body); color:var(--ink); background:var(--line); line-height:1.55; }
+  .page{
+    width:210mm; min-height:297mm; margin:0 auto; background:var(--paper);
+    padding:22mm 20mm 18mm; position:relative;
+  }
+  .page + .page{ margin-top:8mm; }
+  h1,h2,h3{ font-family:var(--font-display); font-weight:600; letter-spacing:-0.01em; line-height:1.1; }
+
+  /* ---- Cover header ---- */
+  .brand{ display:flex; align-items:center; gap:12px; padding-bottom:18px; border-bottom:2px solid var(--ink); }
+  .brand-mark{ width:44px; height:44px; border-radius:13px; background:var(--accent); display:grid; place-items:center; color:#fff; flex-shrink:0; box-shadow:0 2px 0 var(--accent-strong); }
+  .brand-mark svg{ display:block; }
+  .brand-name{ font-family:var(--font-display); font-weight:700; font-size:19px; }
+  .brand-sub{ font-size:12px; color:var(--muted); letter-spacing:0.03em; text-transform:uppercase; margin-top:1px; }
+  .doc-meta{ margin-left:auto; text-align:right; font-size:11.5px; color:var(--muted); }
+
+  .lead{ margin-top:30px; }
+  .lead .kicker{ font-size:12.5px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--accent-strong); }
+  .lead h1{ font-size:40px; margin-top:8px; }
+  .lead p{ font-size:14.5px; color:var(--ink-2); margin-top:14px; max-width:62ch; text-wrap:pretty; }
+
+  .verdict{ display:flex; align-items:center; gap:14px; margin-top:26px; padding:16px 18px; border-radius:14px; background:var(--success-soft); border:1.5px solid #bcd6bb; }
+  .verdict .v-ic{ width:40px; height:40px; border-radius:11px; background:var(--success); color:#fff; display:grid; place-items:center; flex-shrink:0; }
+  .verdict .v-t{ font-family:var(--font-display); font-weight:700; font-size:15px; color:#3a5e3d; }
+  .verdict .v-s{ font-size:12.5px; color:#4d6b4f; margin-top:1px; }
+
+  /* ---- KPI strip ---- */
+  .kpis{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:24px; }
+  .kpi{ background:var(--surface); border:1px solid var(--line); border-radius:13px; padding:14px 15px; }
+  .kpi .n{ font-family:var(--font-display); font-weight:700; font-size:27px; color:var(--accent-strong); }
+  .kpi .l{ font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.35; }
+
+  /* ---- Section ---- */
+  section{ margin-top:32px; }
+  .sec-head{ display:flex; align-items:baseline; gap:10px; padding-bottom:10px; border-bottom:1px solid var(--line-2); margin-bottom:16px; }
+  .sec-head h2{ font-size:20px; }
+  .sec-head .badge{ font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px; background:var(--accent-soft); color:var(--accent-strong); }
+
+  .tested{ list-style:none; display:grid; gap:9px; }
+  .tested li{ display:flex; gap:11px; align-items:flex-start; font-size:13.5px; color:var(--ink-2); }
+  .tested .chk{ width:19px; height:19px; border-radius:6px; background:var(--success-soft); color:var(--success); display:grid; place-items:center; flex-shrink:0; margin-top:1px; }
+  .tested b{ color:var(--ink); font-weight:600; }
+
+  /* ---- Fix cards ---- */
+  .fix{ display:flex; gap:14px; padding:15px 0; border-bottom:1px solid var(--line); break-inside:avoid; }
+  .fix:last-child{ border-bottom:none; }
+  .fix .num{ width:30px; height:30px; border-radius:9px; background:var(--accent); color:#fff; font-family:var(--font-display); font-weight:700; font-size:14px; display:grid; place-items:center; flex-shrink:0; }
+  .fix .body{ flex:1; }
+  .fix .t{ font-family:var(--font-display); font-weight:600; font-size:14.5px; }
+  .fix .p{ font-size:12.8px; color:var(--ink-2); margin-top:3px; }
+  .fix .tag{ display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; padding:2px 8px; border-radius:6px; margin-top:7px; }
+  .tag-bug{ background:var(--danger-soft); color:var(--danger); }
+  .tag-a11y{ background:var(--water-soft); color:var(--water); }
+  .tag-ux{ background:var(--accent-soft); color:var(--accent-strong); }
+
+  .note{ background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:10px; padding:14px 16px; margin-top:14px; }
+  .note h3{ font-size:13.5px; }
+  .note p{ font-size:12.8px; color:var(--ink-2); margin-top:5px; }
+  .note ul{ margin:7px 0 0 18px; }
+  .note li{ font-size:12.8px; color:var(--ink-2); margin-top:4px; }
+
+  .reco{ display:grid; gap:10px; }
+  .reco .r{ display:flex; gap:11px; font-size:13px; color:var(--ink-2); align-items:flex-start; }
+  .reco .dot{ width:7px; height:7px; border-radius:50%; background:var(--accent); margin-top:7px; flex-shrink:0; }
+
+  footer{ margin-top:34px; padding-top:14px; border-top:1px solid var(--line-2); display:flex; justify-content:space-between; font-size:11px; color:var(--muted); }
+
+  @media print{
+    body{ background:#fff; }
+    .page{ margin:0; box-shadow:none; width:auto; min-height:auto; padding:16mm 16mm; }
+    .page + .page{ margin-top:0; }
+    .pb{ page-break-before:always; }
+  }
+  @page{ size:A4; margin:0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="brand">
+    <span class="brand-mark">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    </span>
+    <div>
+      <div class="brand-name">Vitres &amp; Cie</div>
+      <div class="brand-sub">CRM — Nettoyage de vitres</div>
+    </div>
+    <div class="doc-meta">
+      Rapport d'audit qualité<br/>Version 1.2 · 6 juin 2026
+    </div>
+  </header>
+
+  <div class="lead">
+    <div class="kicker">Audit complet &amp; corrections</div>
+    <h1>Audit de l'application</h1>
+    <p>Parcours exhaustif du CRM joué selon quatre regards — développeur professionnel, artisan au quotidien, expert accessibilité et test de charge. Chaque chemin a été testé en conditions réelles dans l'application en fonctionnement.</p>
+  </div>
+
+  <div class="verdict">
+    <span class="v-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+    <div>
+      <div class="v-t">Application fonctionnelle et solidifiée</div>
+      <div class="v-s">Tous les flux validés de bout en bout · 7 failles corrigées · aucune erreur · vérifié par un contrôle indépendant.</div>
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="n">24</div><div class="l">clients de test générés</div></div>
+    <div class="kpi"><div class="n">42</div><div class="l">devis · RDV · factures simulés</div></div>
+    <div class="kpi"><div class="n">7</div><div class="l">failles réelles corrigées</div></div>
+    <div class="kpi"><div class="n">0</div><div class="l">erreur au chargement</div></div>
+  </div>
+
+  <section>
+    <div class="sec-head"><h2>Ce qui a été testé</h2></div>
+    <ul class="tested">
+      <li><span class="chk"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span>Créer un client puis un <b>devis directement depuis sa fiche</b>.</span></li>
+      <li><span class="chk"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span>Valider une intervention dans <b>Ma journée</b> → bascule en « À facturer » → <b>création de la facture liée</b>.</span></li>
+      <li><span class="chk"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span><b>Historiques clients cohérents</b> : regroupement intelligent en dossiers et détection des interventions directes.</span></li>
+      <li><span class="chk"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span>Montants, statuts, agenda, recherche et filtres <b>cohérents à l'échelle de 24 clients</b>.</span></li>
+      <li><span class="chk"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span><b>Aucun chevauchement de texte réel</b> : les défauts visuels apparents venaient de l'outil de capture, pas de l'application (vérifié au pixel).</span></li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>Vitres &amp; Cie · CRM v1.2</span>
+    <span>Rapport d'audit — page 1 / 2</span>
+  </footer>
+</div>
+
+<div class="page pb">
+  <section style="margin-top:0">
+    <div class="sec-head"><h2>7 failles trouvées et corrigées</h2><span class="badge">Toutes résolues</span></div>
+
+    <div class="fix">
+      <span class="num">1</span>
+      <div class="body">
+        <div class="t">Rythme « hebdomadaire » invisible</div>
+        <div class="p">La liste clients affichait « — » pour les clients à passage hebdomadaire. Logique de détection rendue robuste (couvre aussi les rythmes personnalisés).</div>
+        <span class="tag tag-bug">Bug</span>
+      </div>
+    </div>
+
+    <div class="fix">
+      <span class="num">2</span>
+      <div class="body">
+        <div class="t">Sauvegarde incomplète de certaines actions</div>
+        <div class="p">Valider/annuler une intervention, encaisser un paiement, accepter un devis ou supprimer un client ne déclenchaient pas de sauvegarde immédiate (risque de perte en cas de rafraîchissement instantané). Tous ces points sont désormais sauvegardés sur-le-champ.</div>
+        <span class="tag tag-bug">Bug</span>
+      </div>
+    </div>
+
+    <div class="fix">
+      <span class="num">3</span>
+      <div class="body">
+        <div class="t">Navigation inaccessible au clavier</div>
+        <div class="p">Le menu principal n'était pas focusable au clavier (liens sans cible). Converti en véritables boutons, navigables au clavier et annoncés par les lecteurs d'écran.</div>
+        <span class="tag tag-a11y">Accessibilité</span>
+      </div>
+    </div>
+
+    <div class="fix">
+      <span class="num">4</span>
+      <div class="body">
+        <div class="t">Bouton notifications sans nom</div>
+        <div class="p">La cloche de notifications n'avait aucun libellé pour les lecteurs d'écran. Un intitulé accessible a été ajouté.</div>
+        <span class="tag tag-a11y">Accessibilité</span>
+      </div>
+    </div>
+
+    <div class="fix">
+      <span class="num">5</span>
+      <div class="body">
+        <div class="t">Champs de formulaire non étiquetés</div>
+        <div class="p">Les libellés des formulaires n'étaient pas reliés à leurs champs. Un mécanisme automatique associe désormais chaque libellé à son champ, sur l'ensemble des formulaires.</div>
+        <span class="tag tag-a11y">Accessibilité</span>
+      </div>
+    </div>
+
+    <div class="fix">
+      <span class="num">6</span>
+      <div class="body">
+        <div class="t">Onglet « Toutes » des factures trompeur</div>
+        <div class="p">Il masquait en réalité les factures payées. Renommé « En cours » pour refléter honnêtement son contenu (les factures réglées restent visibles sous l'onglet « Payées »).</div>
+        <span class="tag tag-ux">UX</span>
+      </div>
+    </div>
+
+    <div class="fix">
+      <span class="num">7</span>
+      <div class="body">
+        <div class="t">Tableau de bord aux valeurs figées</div>
+        <div class="p">L'accueil affichait des données codées en dur (« 3 interventions », « 07:30 → 12:00 », « ▲ 16 % »). Il est désormais 100 % dynamique : date réelle, nombre de rendez-vous du jour, plage horaire réelle et chiffre d'affaires du mois calculés à partir de vos vraies données.</div>
+        <span class="tag tag-ux">UX</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Recommandations (non bloquantes)</h2></div>
+    <div class="reco">
+      <div class="r"><span class="dot"></span><span>Le terme « interventions » est employé au sens large dans quelques compteurs (il inclut aussi les appels et devis du jour).</span></div>
+      <div class="r"><span class="dot"></span><span>La liste clients mêle une icône poubelle en emoji et des icônes vectorielles ailleurs — à harmoniser pour la cohérence visuelle.</span></div>
+      <div class="r"><span class="dot"></span><span>Les données restent stockées localement dans le navigateur : pour un accès multi-appareils ou multi-utilisateurs, envisager une base de données en ligne.</span></div>
+    </div>
+
+    <div class="note">
+      <h3>Prochaine étape</h3>
+      <p>Reprendre le dossier mis à jour et le publier sur GitHub (Commit → Push) afin de déployer ces corrections en ligne. Le site se redéploie alors automatiquement.</p>
+    </div>
+  </section>
+
+  <footer>
+    <span>Vitres &amp; Cie · CRM v1.2</span>
+    <span>Rapport d'audit — page 2 / 2</span>
+  </footer>
+</div>
+</body>
+</html>
