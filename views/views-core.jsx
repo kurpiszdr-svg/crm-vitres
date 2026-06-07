@@ -22,7 +22,7 @@ function BarChart({ data, valueKey = "ca", labelKey = "month", format = (v) => v
 
 // ---------- DASHBOARD ----------
 function DashboardView({ nav }) {
-  const { appointments, invoices, quotes, clientById, revenueByMonth, today, invoiceTotal, invoicePaid, quoteTotal } = window.CRM;
+  const { appointments, invoices, quotes, clientById, clientName, revenueByMonth, today, invoiceTotal, invoicePaid, quoteTotal } = window.CRM;
 
   const todayAppts = appointments.filter((a) => a.date === today).sort((a, b) => a.start.localeCompare(b.start));
   const caMonth = invoices.filter((f) => f.status === "payee" && f.paidDate && f.paidDate.startsWith("2026-05")).reduce((s, f) => s + invoicePaid(f), 0);
@@ -52,22 +52,20 @@ function DashboardView({ nav }) {
 
   // ── Notifications (Accueil) : vert = accepté/payé · rouge = devis +7j / facture +20j ──
   const daysSince = (d) => Math.floor((new Date(today + "T00:00:00") - new Date(d + "T00:00:00")) / 86400000);
-  const notifsRed = [
-    ...quotes.filter(q => q.status === "envoye" && daysSince(q.date) > 7).map(q => ({ kind: "devis", title: "Devis en attente · +7 jours", ref: q.ref, client: (clientById(q.clientId) || {}).name, date: q.date, status: "Sans réponse", btn: "Voir le devis", go: () => nav("quotes") })),
-    ...invoices.filter(f => (f.status === "envoyee" || f.status === "en_retard") && daysSince(f.date) > 20).map(f => ({ kind: "facture", title: "Facture impayée · +20 jours", ref: f.ref, client: (clientById(f.clientId) || {}).name, date: f.date, status: "En retard", btn: "Voir la facture", go: () => nav("invoices") })),
-  ].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  const notifsGreen = [
-    ...quotes.filter(q => q.status === "accepte" && !scheduledIds.has(q.id)).map(q => ({ kind: "devis", title: "Devis accepté", ref: q.ref, client: (clientById(q.clientId) || {}).name, date: q.date, status: "Accepté", btn: "Voir le devis", go: () => nav("quotes") })),
-    ...invoices.filter(f => f.status === "payee" && f.paidDate && daysSince(f.paidDate) <= 2).map(f => ({ kind: "facture", title: "Facture payée", ref: f.ref, client: (clientById(f.clientId) || {}).name, date: f.paidDate || f.date, status: "Payée", btn: "Voir la facture", go: () => nav("invoices") })),
-  ].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  const notifIcon = (n) => n.kind === "devis" ? (n.status === "Accepté" ? "check" : "clock") : (n.status === "Payée" ? "euro" : "invoices");
-
-  const alerts = [
-    ...interventionsAFacturer.map((a) => ({ tone: "warning", icon: "invoices", text: `Intervention à facturer`, sub: `${clientById(a.clientId).name} · ${a.title} · ${eur(a.price)}`, go: () => nav("invoiceNew", { clientId: a.clientId, apptId: a.id }) })),
-    ...devisAProg.map((q) => ({ tone: "success", icon: "calendar", text: `Devis ${q.ref} à programmer`, sub: `${clientById(q.clientId).name} · ${eur(quoteTotal(q))}`, go: () => nav("apptNew", { clientId: q.clientId, quoteId: q.id, returnTo: "dashboard" }) })),
-    ...overdue.map((f) => ({ tone: "danger", icon: "invoices", text: `Facture ${f.ref} en retard`, sub: `${clientById(f.clientId).name} · ${eur(invoiceTotal(f))}`, go: () => nav("invoices") })),
-    ...pendingQuotes.map((q) => ({ tone: "water", icon: "quotes", text: `Devis ${q.ref} sans réponse`, sub: `${clientById(q.clientId).name} · envoyé le ${fmtDateShort(q.date)}`, go: () => nav("quotes") })),
-  ].slice(0, 6);
+  // ── Liste de priorités unifiée (fusion Notifications + À traiter), triée par urgence, dédoublonnée ──
+  const recentPaid = invoices.filter((f) => f.status === "payee" && f.paidDate && daysSince(f.paidDate) <= 7);
+  const priorities = [
+    // 1. Factures en retard (urgence maximale)
+    ...invoices.filter((f) => f.status === "en_retard").map((f) => ({ prio: 0, tone: "danger", icon: "invoices", text: `Facture ${f.ref} en retard`, sub: `${clientName(f.clientId)} · ${eur(invoiceTotal(f))}`, go: () => nav("invoices") })),
+    // 2. Factures impayées depuis +20 jours (envoyées, pas encore en retard) — à ne pas rater
+    ...invoices.filter((f) => f.status === "envoyee" && daysSince(f.date) > 20).map((f) => ({ prio: 1, tone: "danger", icon: "invoices", text: `Facture ${f.ref} impayée · +20 j`, sub: `${clientName(f.clientId)} · ${eur(invoiceTotal(f))}`, go: () => nav("invoices") })),
+    // 3. Interventions réalisées à facturer
+    ...interventionsAFacturer.map((a) => ({ prio: 2, tone: "warning", icon: "invoices", text: `Intervention à facturer`, sub: `${clientName(a.clientId)} · ${a.title} · ${eur(a.price)}`, go: () => nav("invoiceNew", { clientId: a.clientId, apptId: a.id }) })),
+    // 4. Devis acceptés à programmer
+    ...devisAProg.map((q) => ({ prio: 3, tone: "success", icon: "calendar", text: `Devis ${q.ref} à programmer`, sub: `${clientName(q.clientId)} · ${eur(quoteTotal(q))}`, go: () => nav("apptNew", { clientId: q.clientId, quoteId: q.id, returnTo: "dashboard" }) })),
+    // 5. Devis envoyés sans réponse
+    ...pendingQuotes.map((q) => ({ prio: 4, tone: "water", icon: "quotes", text: `Devis ${q.ref} sans réponse`, sub: `${clientName(q.clientId)} · envoyé le ${fmtDateShort(q.date)}`, go: () => nav("quotes") })),
+  ].sort((a, b) => a.prio - b.prio);
 
   return (
     <div className="view content-narrow">
@@ -76,84 +74,48 @@ function DashboardView({ nav }) {
           <p className="dash-greet">Bonjour Julien 👋</p>
           <h1 className="dash-title">{todayLabel} — {todayAppts.length} rendez-vous prévu{todayAppts.length > 1 ? "s" : ""}</h1>
         </div>
-        <Button variant="outline" size="sm" icon="plus" onClick={() => nav("apptNew")}>Nouveau RDV</Button>
       </div>
 
 
 
-      <div className="grid grid-4 stats-grid" style={{ marginTop: 22 }}>
+      <div className="grid grid-3 stats-grid" style={{ marginTop: 22 }}>
         <Stat label={`CA du mois (${monthName})`} value={eur(caMonthDyn)} delta={caMonthCount > 0 ? `${caMonthCount} facture${caMonthCount > 1 ? "s" : ""} réglée${caMonthCount > 1 ? "s" : ""}` : "encaissé ce mois"} deltaTone={caMonthCount > 0 ? "up" : "neutral"} icon="euro" />
         <Stat label="En attente de paiement" value={eur(outstandingTotal)} delta={`${outstanding.length} facture${outstanding.length > 1 ? "s" : ""}`} deltaTone="neutral" icon="invoices" />
-        <Stat label="RDV aujourd'hui" value={todayAppts.length} delta={dayRange} deltaTone="neutral" icon="calendar" />
         <Stat label="Devis en cours" value={pendingQuotes.length} delta={eur(pendingQuotes.reduce((s, q) => s + quoteTotal(q), 0))} deltaTone="neutral" icon="quotes" />
       </div>
 
-      {/* Notifications */}
-      <Card className="pad" style={{ marginTop: 18 }}>
-        <SectionTitle compact title="Notifications" subtitle={`${notifsRed.length} à surveiller · ${notifsGreen.length} validé${notifsGreen.length > 1 ? "s" : ""}`} />
-        {(notifsRed.length === 0 && notifsGreen.length === 0) ? (
-          <div className="v2-empty-zone" style={{ marginTop: 4 }}><Icon name="check" size={18} /><span>Aucune notification</span></div>
-        ) : (
-          <div style={{ marginTop: 4 }}>
-            {notifsRed.length > 0 && (
-              <>
-                <div className="dn-sec-h"><span className="dn-dot" style={{ background: "var(--danger)" }} /> À surveiller <span className="dn-count" style={{ background: "var(--danger-soft)", color: "var(--danger)" }}>{notifsRed.length}</span></div>
-                {notifsRed.map((n, i) => (
-                  <div className="dn-item dn-red" key={"r" + i}>
-                    <span className="dn-ic"><Icon name={notifIcon(n)} size={18} /></span>
-                    <div className="dn-main">
-                      <div className="dn-title">{n.title}</div>
-                      <div className="dn-desc">{n.ref} — <b>{n.client}</b></div>
-                      <div className="dn-meta"><span>envoyé le {fmtDateShort(n.date)}</span><span className="dn-chip" style={{ background: "var(--danger-soft)", color: "var(--danger)" }}>{n.status}</span></div>
-                    </div>
-                    <Button variant="outline" size="sm" className="dn-btn" onClick={n.go}>{n.btn}</Button>
+      {/* À traiter aujourd'hui — liste de priorités unifiée (Notifications + À traiter fusionnés) */}
+      <Card className="pad" style={{ marginTop: 18, display: "flex", flexDirection: "column", minHeight: "calc(100vh - 360px)" }}>
+        <SectionTitle compact title="À traiter aujourd'hui" subtitle={priorities.length ? `${priorities.length} priorité${priorities.length > 1 ? "s" : ""} · triées par urgence` : "Rien d'urgent"} />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+          {priorities.length === 0 ? (
+            <div className="v2-empty-zone"><Icon name="check" size={18} /><span>Tout est à jour</span></div>
+          ) : (
+            <>
+              {priorities.slice(0, 8).map((al, i) => (
+                <div className="alert-item" key={i} onClick={al.go} role="button" tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); al.go(); } }}>
+                  <span className={`alert-ic alert-${al.tone}`}><Icon name={al.icon} size={17} /></span>
+                  <div className="col" style={{ gap: 1, flex: 1, minWidth: 0 }}>
+                    <span className="ai-text">{al.text}</span>
+                    <span className="ai-sub">{al.sub}</span>
                   </div>
-                ))}
-              </>
-            )}
-            {notifsGreen.length > 0 && (
-              <>
-                <div className="dn-sec-h" style={{ marginTop: notifsRed.length > 0 ? 20 : 4 }}><span className="dn-dot" style={{ background: "var(--success)" }} /> Validé / Payé <span className="dn-count" style={{ background: "var(--success-soft)", color: "var(--success)" }}>{notifsGreen.length}</span></div>
-                {notifsGreen.map((n, i) => (
-                  <div className="dn-item dn-green" key={"g" + i}>
-                    <span className="dn-ic"><Icon name={notifIcon(n)} size={18} /></span>
-                    <div className="dn-main">
-                      <div className="dn-title">{n.title}</div>
-                      <div className="dn-desc">{n.ref} — <b>{n.client}</b></div>
-                      <div className="dn-meta"><span>{fmtDateShort(n.date)}</span><span className="dn-chip" style={{ background: "var(--success-soft)", color: "var(--success)" }}>{n.status}</span></div>
-                    </div>
-                    <Button variant="outline" size="sm" className="dn-btn" onClick={n.go}>{n.btn}</Button>
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
+                  <Icon name="chevronRight" size={16} className="ai-chev" />
+                </div>
+              ))}
+              {priorities.length > 8 && (
+                <button className="ai-more" onClick={() => nav("invoices")}>+ {priorities.length - 8} autre{priorities.length - 8 > 1 ? "s" : ""}…</button>
+              )}
+            </>
+          )}
+        </div>
+        {recentPaid.length > 0 && (
+          <button className="dash-validated" onClick={() => nav("invoices")}>
+            <Icon name="check" size={15} />
+            <span>{recentPaid.length} facture{recentPaid.length > 1 ? "s" : ""} réglée{recentPaid.length > 1 ? "s" : ""} récemment</span>
+          </button>
         )}
       </Card>
-
-      {/* Tournée + alertes */}
-      <div className="grid" style={{ gridTemplateColumns: "1fr", marginTop: 18, alignItems: "stretch", minHeight: "calc(100vh - 320px)" }}>
-
-        <Card className="pad" style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <SectionTitle compact title="À traiter" subtitle={`${alerts.length} éléments`} />
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-            {alerts.map((al, i) => (
-              <div className="alert-item" key={i} onClick={al.go}>
-                <span className={`alert-ic alert-${al.tone}`}><Icon name={al.icon} size={17} /></span>
-                <div className="col" style={{ gap: 1, flex: 1, minWidth: 0 }}>
-                  <span className="ai-text">{al.text}</span>
-                  <span className="ai-sub">{al.sub}</span>
-                </div>
-                <Icon name="chevronRight" size={16} className="ai-chev" />
-              </div>
-            ))}
-            <div className="v2-empty-zone">
-              <Icon name="check" size={18} />
-              <span>Tout est à jour</span>
-            </div>
-          </div>
-        </Card>
-      </div>
     </div>
   );
 }
@@ -241,18 +203,16 @@ function ClientsView({ nav }) {
                     <td className="hide-mobile t-muted">{lv ? fmtDateShort(lv) : "—"}</td>
                     <td className="hide-mobile"><Badge tone="neutral">{rhythm}</Badge></td>
                     <td className="num t-mono">{c.vitres}</td>
-                    <td className="num"><Icon name="chevronRight" size={16} className="t-muted" /></td>
                     <td className="num">
-                      <button style={{ fontSize: 20, lineHeight: 1, padding: "4px 8px", background: "none", border: "none", cursor: "pointer", color: "var(--muted)", borderRadius: 8 }}
-                        title="Supprimer"
-                        onClick={(e) => { e.stopPropagation(); if (window.confirm(`Supprimer ${c.name} ?`)) { window.CRM.clients.splice(window.CRM.clients.findIndex(x=>x.id===c.id),1); if (window.CRM.save) window.CRM.save(); setFilter(f=>f); } }}>
-                        🗑️
+                      <button className="row-del" aria-label={`Supprimer le client ${c.name}`} title="Supprimer le client"
+                        onClick={(e) => { e.stopPropagation(); if (window.CRM.deleteClient(c.id)) setFilter(f=>f); }}>
+                        <Icon name="trash" size={16} />
                       </button>
                     </td>
                   </tr>
                 );
               })}
-              {filtered.length === 0 && <tr><td colSpan="7" className="t-muted" style={{ textAlign: "center", padding: 28 }}>Aucun client ne correspond à votre recherche.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan="6" className="t-muted" style={{ textAlign: "center", padding: 28 }}>Aucun client ne correspond à votre recherche.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -575,8 +535,8 @@ function ClientDetailView({ nav, params }) {
           </div>
         </div>
         <div className="row hide-mobile" style={{ gap: 8 }}>
+          <Button variant="ghost" size="sm" icon="trash" onClick={() => { if (window.CRM.deleteClient(c.id)) nav("clients"); }}>Supprimer</Button>
           <Button variant="outline" icon="edit" onClick={() => nav("clientNew", { id: c.id })}>Modifier</Button>
-          <Button variant="danger" onClick={() => { if (window.confirm(`Supprimer ${c.name} définitivement ?`)) { window.CRM.clients.splice(window.CRM.clients.findIndex(x=>x.id===c.id),1); nav("clients"); } }}>🗑 Supprimer</Button>
           <Button icon="plus" onClick={() => nav("quoteNew", { clientId: c.id })}>Devis</Button>
         </div>
       </div>
@@ -632,7 +592,8 @@ function DayTimeline({ appts, quotes, clientById, getStatus, setApptStatus, quot
     <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
       {appts.map((a, i) => {
         const c = clientById(a.clientId);
-        if (!c) return null;
+        // Bug #2/#3 fix : ne pas crasher ni ignorer les RDV sans client (type « autre »)
+        // c peut être null → on affiche l'intitulé du RDV comme fallback
         const st = getStatus(a.id);
         const isDone = st === "termine";
         const isAnnule = st === "annule";
@@ -665,9 +626,9 @@ function DayTimeline({ appts, quotes, clientById, getStatus, setApptStatus, quot
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                 {/* Info gauche */}
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13.5, color: (isDone || isAnnule) ? "var(--muted)" : "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, color: (isDone || isAnnule) ? "var(--muted)" : "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c ? c.name : a.title}</div>
                   <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{a.title}</div>
-                  {c.address && <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.address}</div>}
+                  {c && c.address && <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.address}</div>}
                 </div>
                 {/* Info droite */}
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
@@ -710,7 +671,7 @@ function DayTimeline({ appts, quotes, clientById, getStatus, setApptStatus, quot
 }
 
 function MaJourneeView({ nav }) {
-  const { appointments, clientById, invoices, quotes, invoiceTotal, quoteTotal, today } = window.CRM;
+  const { appointments, clientById, clientName, invoices, quotes, invoiceTotal, quoteTotal, today } = window.CRM;
 
   const [selectedDate, setSelectedDate] = React.useState(today);
   const shiftDay = (n) => {
@@ -775,7 +736,7 @@ function MaJourneeView({ nav }) {
           {!isToday && <button className="btn btn-outline btn-sm" onClick={() => setSelectedDate(today)}>Aujourd'hui</button>}
         </div>
         <p className="dash-greet" style={{ marginTop: 6 }}>
-          {todayAppts.length} intervention{todayAppts.length !== 1 ? "s" : ""} · {eur(totalDay)} prévu
+          {todayAppts.length} rendez-vous · {eur(totalDay)} prévu{todayAppts.length > 0 ? ` · ${todayAppts[0].start} → ${todayAppts[todayAppts.length - 1].end}` : ""}
         </p>
       </div>
 
@@ -830,7 +791,7 @@ function MaJourneeView({ nav }) {
             {nonVal.map(a => (
               <div key={a.id} className="mj-bloc-row">
                 <div className="col" style={{ flex: 1, minWidth: 0, gap: 1 }}>
-                  <span className="t-strong" style={{ fontSize: 13.5 }}>{clientById(a.clientId).name}</span>
+                  <span className="t-strong" style={{ fontSize: 13.5 }}>{clientName(a.clientId)}</span>
                   <span className="cc-meta">{a.start}–{a.end}</span>
                 </div>
                 <div className="row" style={{ gap: 5 }}>
@@ -859,7 +820,7 @@ function MaJourneeView({ nav }) {
             {aFact.map(a => (
               <div key={a.id} className="mj-bloc-row">
                 <div className="col" style={{ flex: 1, minWidth: 0, gap: 1 }}>
-                  <span className="t-strong" style={{ fontSize: 13.5 }}>{clientById(a.clientId).name}</span>
+                  <span className="t-strong" style={{ fontSize: 13.5 }}>{clientName(a.clientId)}</span>
                   <span className="cc-meta" style={{ color: "var(--water)", fontWeight: 600 }}>{eur(a.price)}</span>
                 </div>
                 <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); nav("invoiceNew", { clientId: a.clientId, apptId: a.id }); }}>

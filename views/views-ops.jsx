@@ -26,7 +26,7 @@ function DocOverlay({ open, onClose, children, actions }) {
 function PaperDoc({ kind, doc }) {
   const { company, clientById, quoteTotal, invoiceTotal } = window.CRM;
   const legal = useLegal();
-  const c = clientById(doc.clientId);
+  const c = clientById(doc.clientId) || { id: null, name: "Client supprimé", type: "particulier", address: "", contact: "", siret: "" };
   const total = kind === "devis" ? quoteTotal(doc) : invoiceTotal(doc);
   return (
     <div className="paper">
@@ -416,7 +416,7 @@ function CalendarView({ nav, params }) {
 }
 
 // ---------- DEVIS ----------
-function QuotesView({ nav }) {
+function QuotesView({ nav, embedded }) {
   const { quotes, clientById, quoteTotal, appointments, invoices, invoicePaid } = window.CRM;
   const [filter, setFilter] = React.useState("tous");
   const [openDoc, setOpenDoc] = React.useState(null);
@@ -449,8 +449,8 @@ function QuotesView({ nav }) {
   const sumEncaisse = invoices.filter((f) => f.status === "payee").reduce((s, f) => s + invoicePaid(f), 0);
 
   return (
-    <div className="view">
-      <SectionTitle title="Devis" subtitle="Créé → Envoyé → Accepté, puis programmez l'intervention ou facturez." action={<Button icon="plus" onClick={() => nav("quoteNew")}>Nouveau devis</Button>} />
+    <div className={embedded ? "" : "view"}>
+      {!embedded && <SectionTitle title="Devis" subtitle="Créé → Envoyé → Accepté, puis programmez l'intervention ou facturez." action={<Button icon="plus" onClick={() => nav("quoteNew")}>Nouveau devis</Button>} />}
 
       <div className="grid grid-3 stats-grid" style={{ marginBottom: 18 }}>
         <Stat label="En cours d'acceptation" value={eur(sumEnCours)} delta="en attente de réponse" deltaTone="neutral" icon="clock" />
@@ -482,7 +482,7 @@ function QuotesView({ nav }) {
             <thead><tr><th>Référence</th><th>Client</th><th className="hide-mobile">Date</th><th className="hide-mobile">Validité</th><th>Statut</th><th className="num">Montant</th><th style={{width:130}}></th></tr></thead>
             <tbody>
               {filtered.map((q) => {
-                const c = clientById(q.clientId);
+                const c = clientById(q.clientId) || { id: null, name: "Client supprimé", type: "particulier" };
                 return (
                   <tr key={q.id} className="clickable" onClick={() => setOpenDoc(q)}>
                     <td className="t-strong">{q.ref}</td>
@@ -541,7 +541,7 @@ function QuotesView({ nav }) {
 }
 
 // ---------- FACTURES ----------
-function InvoicesView({ nav }) {
+function InvoicesView({ nav, embedded }) {
   const { invoices, clientById, invoiceTotal, invoicePaid } = window.CRM;
   const [filter, setFilter] = React.useState("tous");
   const [openDoc, setOpenDoc] = React.useState(null);
@@ -582,8 +582,8 @@ function InvoicesView({ nav }) {
   const paidThisMonth = invoices.filter((f) => f.status === "payee").reduce((s, f) => s + invoicePaid(f), 0);
 
   return (
-    <div className="view">
-      <SectionTitle title="Factures" subtitle="Créée → Envoyée → Payée. Une facture « En retard » est à relancer." action={<Button icon="plus" onClick={() => nav("invoiceNew")}>Nouvelle facture</Button>} />
+    <div className={embedded ? "" : "view"}>
+      {!embedded && <SectionTitle title="Factures" subtitle="Créée → Envoyée → Payée. Une facture « En retard » est à relancer." action={<Button icon="plus" onClick={() => nav("invoiceNew")}>Nouvelle facture</Button>} />}
 
       <div className="grid grid-3 stats-grid" style={{ marginBottom: 18 }}>
         <Stat label="Encaissé" value={eur(paidThisMonth)} delta="réglées" deltaTone="up" icon="euro" />
@@ -615,7 +615,7 @@ function InvoicesView({ nav }) {
             <thead><tr><th>Référence</th><th>Client</th><th className="hide-mobile">Émise</th><th>Échéance</th><th>Statut</th><th className="num">Montant</th></tr></thead>
             <tbody>
               {filtered.map((f) => {
-                const c = clientById(f.clientId);
+                const c = clientById(f.clientId) || { id: null, name: "Client supprimé", type: "particulier" };
                 const late = f.status === "en_retard";
                 return (
                   <tr key={f.id} className="clickable" onClick={() => setOpenDoc(f)}>
@@ -654,7 +654,7 @@ function InvoicesView({ nav }) {
               <div className="field">
                 <label>Mode de paiement</label>
                 <select className="select" value={payMethod} onChange={e => setPayMethod(e.target.value)}>
-                  <option>Virement</option><option>Esp\u00e8ces</option><option>Ch\u00e8que</option><option>Carte bancaire</option><option>PayPal</option>
+                  <option>Virement</option><option>Espèces</option><option>Chèque</option><option>Carte bancaire</option><option>PayPal</option>
                 </select>
               </div>
               <div className="field">

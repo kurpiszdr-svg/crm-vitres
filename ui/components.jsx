@@ -27,6 +27,7 @@ const ICON_PATHS = {
   more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   edit: '<path d="M5 19h14M7 15l9-9 3 3-9 9H7v-3Z"/>',
   trash: '<path d="M4 6h16M9 6V4h6v2M6 6l1 14h10l1-14"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   star: '<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17l-5.2 2.6 1-5.8-4.3-4.1 5.9-.9L12 3.5Z"/>',
   arrowUpRight: '<path d="M7 17 17 7M9 7h8v8"/>',
   send: '<path d="M21 4 3 11l7 2.5L13 21l8-17Z"/><path d="m10 13.5 4-4"/>',

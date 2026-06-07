@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bouton « Créer » — propositions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#faf6f1; --paper-2:#f2ebe2; --surface:#fffdfb; --surface-2:#f7f1ea;
+    --ink:#2b2522; --ink-2:#5c5248; --muted:#8c8174;
+    --line:#ece3d8; --line-2:#ddd0c2;
+    --accent:#c2703f; --accent-strong:#a85a2d; --accent-soft:#f6e6da;
+    --water:#5f7fa8; --water-soft:#e2e9f2; --success:#5a8a5f; --success-soft:#e4efe2;
+    --font-display:"Bricolage Grotesque", Georgia, serif;
+    --font-body:"Hanken Grotesk", system-ui, sans-serif;
+    --shadow:0 12px 32px rgba(80,60,40,0.14);
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:var(--font-body); background:var(--paper); color:var(--ink); line-height:1.5; -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:1080px; margin:0 auto; padding:46px 28px 90px; }
+  h1{ font-family:var(--font-display); font-weight:700; font-size:34px; letter-spacing:-0.01em; }
+  .sub{ color:var(--ink-2); font-size:15px; margin-top:10px; max-width:64ch; }
+  button{ font:inherit; cursor:pointer; border:none; background:none; color:inherit; }
+  .icon{ display:inline-grid; place-items:center; flex-shrink:0; }
+
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:22px; margin-top:34px; }
+  @media (max-width:780px){ .grid{ grid-template-columns:1fr; } }
+
+  .prop{ background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:22px; display:flex; flex-direction:column; min-height:340px; }
+  .prop-head{ display:flex; align-items:baseline; gap:10px; }
+  .prop-num{ font-family:var(--font-display); font-weight:700; font-size:13px; color:#fff; background:var(--accent); width:24px; height:24px; border-radius:7px; display:grid; place-items:center; flex-shrink:0; }
+  .prop-title{ font-family:var(--font-display); font-weight:600; font-size:18px; }
+  .prop-desc{ font-size:13px; color:var(--muted); margin:8px 0 0; }
+  .prop-tag{ display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px; background:var(--accent-soft); color:var(--accent-strong); margin-top:12px; align-self:flex-start; }
+  .stage{ flex:1; margin-top:18px; border-radius:14px; background:var(--surface-2); border:1px solid var(--line); position:relative; display:flex; align-items:flex-start; justify-content:flex-end; padding:16px; min-height:150px; overflow:visible; }
+  .stage.center{ align-items:center; justify-content:center; }
+  .hint{ position:absolute; left:16px; bottom:14px; font-size:11.5px; color:var(--muted); }
+
+  /* fake topbar context */
+  .minibar{ position:absolute; inset:0; display:flex; align-items:center; gap:8px; padding:0 16px; }
+  .minibrand{ font-family:var(--font-display); font-weight:700; font-size:13px; color:var(--ink); }
+  .minispacer{ flex:1; }
+  .minidot{ width:30px; height:30px; border-radius:8px; background:var(--paper-2); display:grid; place-items:center; color:var(--muted); }
+
+  /* ---- Primary create button (shared base) ---- */
+  .btn-create{ display:inline-flex; align-items:center; gap:8px; background:var(--accent); color:#fff; font-weight:600; font-size:14px; padding:10px 16px; border-radius:11px; box-shadow:0 2px 0 var(--accent-strong); transition:transform .08s, filter .15s; }
+  .btn-create:hover{ filter:brightness(1.04); }
+  .btn-create:active{ transform:translateY(1px); }
+  .btn-create .plus{ font-size:17px; line-height:1; }
+
+  /* ---- Menu (proposal 1) ---- */
+  .menu{ position:absolute; top:58px; right:16px; width:230px; background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); padding:7px; opacity:0; transform:translateY(-6px) scale(.98); pointer-events:none; transition:opacity .15s, transform .15s; z-index:5; }
+  .menu.open{ opacity:1; transform:none; pointer-events:auto; }
+  .menu-item{ display:flex; align-items:center; gap:11px; width:100%; padding:10px 11px; border-radius:9px; font-size:13.5px; font-weight:600; color:var(--ink-2); text-align:left; transition:background .12s, color .12s; }
+  .menu-item:hover{ background:var(--paper-2); color:var(--ink); }
+  .menu-ic{ width:30px; height:30px; border-radius:8px; display:grid; place-items:center; flex-shrink:0; }
+
+  /* ---- Modal / command (proposal 2) ---- */
+  .overlay{ position:fixed; inset:0; background:rgba(43,37,34,0.42); backdrop-filter:blur(3px); display:flex; align-items:flex-start; justify-content:center; padding-top:14vh; opacity:0; pointer-events:none; transition:opacity .18s; z-index:50; }
+  .overlay.open{ opacity:1; pointer-events:auto; }
+  .cmd{ width:min(540px,92vw); background:var(--surface); border:1px solid var(--line); border-radius:20px; box-shadow:var(--shadow); padding:22px; transform:translateY(-10px) scale(.98); transition:transform .18s; }
+  .overlay.open .cmd{ transform:none; }
+  .cmd-h{ font-family:var(--font-display); font-weight:600; font-size:17px; }
+  .cmd-sub{ font-size:12.5px; color:var(--muted); margin-top:3px; }
+  .cmd-grid{ display:grid; grid-template-columns:1fr 1fr; gap:11px; margin-top:18px; }
+  .cmd-tile{ display:flex; align-items:center; gap:12px; padding:15px; border-radius:13px; border:1px solid var(--line); background:var(--surface-2); text-align:left; transition:border-color .12s, background .12s, transform .08s; }
+  .cmd-tile:hover{ border-color:var(--accent); background:var(--accent-soft); }
+  .cmd-tile:active{ transform:scale(.98); }
+  .cmd-tile .menu-ic{ width:38px; height:38px; border-radius:10px; }
+  .cmd-tile .tl{ font-weight:600; font-size:14px; color:var(--ink); }
+  .cmd-tile .ts{ font-size:11.5px; color:var(--muted); margin-top:1px; }
+  .cmd-key{ margin-left:auto; font-size:10.5px; font-weight:700; color:var(--muted); background:var(--paper-2); padding:2px 6px; border-radius:5px; font-family:var(--font-body); }
+
+  /* ---- FAB (proposal 3) ---- */
+  .fab-zone{ position:absolute; right:18px; bottom:18px; display:flex; flex-direction:column-reverse; align-items:flex-end; gap:11px; }
+  .fab{ width:54px; height:54px; border-radius:16px; background:var(--accent); color:#fff; display:grid; place-items:center; box-shadow:0 6px 18px rgba(168,90,45,0.4); transition:transform .2s; }
+  .fab.open{ transform:rotate(45deg); }
+  .fab .plus{ font-size:26px; line-height:1; }
+  .fab-actions{ display:flex; flex-direction:column; gap:9px; align-items:flex-end; }
+  .fab-act{ display:flex; align-items:center; gap:10px; opacity:0; transform:translateY(10px) scale(.9); pointer-events:none; transition:opacity .18s, transform .18s; }
+  .fab-zone.open .fab-act{ opacity:1; transform:none; pointer-events:auto; }
+  .fab-zone.open .fab-act:nth-child(1){ transition-delay:.02s; }
+  .fab-zone.open .fab-act:nth-child(2){ transition-delay:.05s; }
+  .fab-zone.open .fab-act:nth-child(3){ transition-delay:.08s; }
+  .fab-zone.open .fab-act:nth-child(4){ transition-delay:.11s; }
+  .fab-label{ background:var(--surface); border:1px solid var(--line); box-shadow:0 3px 10px rgba(80,60,40,0.12); font-size:12.5px; font-weight:600; color:var(--ink); padding:6px 11px; border-radius:9px; white-space:nowrap; }
+  .fab-mini{ width:42px; height:42px; border-radius:13px; background:var(--surface); border:1px solid var(--line); box-shadow:0 3px 10px rgba(80,60,40,0.12); display:grid; place-items:center; }
+
+  /* ---- Split button (proposal 4) ---- */
+  .split{ display:inline-flex; align-items:stretch; border-radius:11px; box-shadow:0 2px 0 var(--accent-strong); overflow:visible; position:relative; }
+  .split-main{ display:inline-flex; align-items:center; gap:7px; background:var(--accent); color:#fff; font-weight:600; font-size:14px; padding:10px 14px; border-radius:11px 0 0 11px; }
+  .split-main:hover{ filter:brightness(1.04); }
+  .split-care{ background:var(--accent-strong); color:#fff; padding:0 11px; border-radius:0 11px 11px 0; display:grid; place-items:center; border-left:1px solid rgba(255,255,255,0.18); }
+  .split-care:hover{ filter:brightness(1.08); }
+  .split .menu{ top:52px; }
+
+  .tag-row{ display:flex; gap:7px; flex-wrap:wrap; margin-top:14px; }
+  .pick{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--accent-strong); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Bouton « Créer » — 4 propositions</h1>
+  <p class="sub">Un point de création unique pour remplacer les boutons dispersés (Nouveau RDV / client / devis / facture). Clique sur chaque bouton pour tester l'ouverture. Dis-moi celui que tu préfères, je l'intègre dans V3.</p>
+
+  <div class="grid" id="grid"></div>
+</div>
+
+<!-- icônes réutilisées -->
+<template id="icons"></template>
+
+<script>
+  const ICONS = {
+    calendar:'<rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/>',
+    client:'<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 11a3 3 0 0 0 0-6M18.5 19a5 5 0 0 0-3-4.6"/>',
+    quotes:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+    invoices:'<path d="M5 3h14v18l-2.5-1.6L14 21l-2-1.6L10 21l-2.5-1.6L5 21z"/><path d="M9 8h6M9 12h6"/>',
+    plus:'<path d="M12 5v14M5 12h14"/>',
+    chevron:'<path d="M6 9l6 6 6-6"/>',
+    bell:'<path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 21a2 2 0 0 0 4 0"/>',
+    search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'
+  };
+  function svg(name, size=18, stroke=2){
+    return '<span class="icon"><svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+stroke+'" stroke-linecap="round" stroke-linejoin="round">'+ICONS[name]+'</svg></span>';
+  }
+  // les 4 actions de création
+  const ACTIONS = [
+    { key:'rdv', label:'Rendez-vous', desc:'Intervention, devis, appel…', icon:'calendar', tone:'accent', kbd:'R' },
+    { key:'client', label:'Client', desc:'Particulier ou pro', icon:'client', tone:'water', kbd:'C' },
+    { key:'devis', label:'Devis', desc:'Proposition commerciale', icon:'quotes', tone:'success', kbd:'D' },
+    { key:'facture', label:'Facture', desc:'Facturation & encaissement', icon:'invoices', tone:'accent', kbd:'F' },
+  ];
+  const toneBg = { accent:'var(--accent-soft)', water:'var(--water-soft)', success:'var(--success-soft)' };
+  const toneFg = { accent:'var(--accent-strong)', water:'var(--water)', success:'var(--success)' };
+  function pick(name){ /* démo : feedback léger */
+    const t=document.getElementById('toast'); t.textContent='→ Créer : '+name; t.classList.add('show');
+    clearTimeout(window.__tt); window.__tt=setTimeout(()=>t.classList.remove('show'),1400);
+    closeAll();
+  }
+  function menuItems(extraClass=''){
+    return ACTIONS.map(a=>`<button class="menu-item ${extraClass}" onclick="pick('${a.label}')">
+      <span class="menu-ic" style="background:${toneBg[a.tone]};color:${toneFg[a.tone]}">${svg(a.icon,16)}</span>
+      <span>${a.label}</span></button>`).join('');
+  }
+
+  function closeAll(){
+    document.querySelectorAll('.menu.open,.overlay.open,.fab-zone.open').forEach(e=>e.classList.remove('open'));
+    document.querySelectorAll('.fab.open').forEach(e=>e.classList.remove('open'));
+  }
+  document.addEventListener('click',(e)=>{ if(!e.target.closest('.js-stop')) closeAll(); });
+  document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') closeAll(); });
+
+  const props = [
+    {
+      n:1, title:'Menu déroulant (barre)', tag:'Sobre · familier',
+      desc:"Un bouton « + Créer » dans la barre du haut qui ouvre un petit menu. Discret, classique, zéro surprise.",
+      stage: `<div class="minibar">
+          <span class="minibrand">Vitres &amp; Cie</span><span class="minispacer"></span>
+          <span class="minidot">${svg('search',15)}</span>
+          <div class="js-stop" style="position:relative">
+            <button class="btn-create" onclick="this.parentNode.querySelector('.menu').classList.toggle('open')"><span class="plus">+</span> Créer</button>
+            <div class="menu">${menuItems()}</div>
+          </div>
+        </div>
+        <span class="hint">Clique « + Créer »</span>`
+    },
+    {
+      n:2, title:'Palette centrée', tag:'Premium · rapide au clavier',
+      desc:"Le bouton ouvre une fenêtre centrée avec 4 grandes tuiles (et des raccourcis clavier). Le plus rapide quand on crée souvent.",
+      stage:`<div class="minibar">
+          <span class="minibrand">Vitres &amp; Cie</span><span class="minispacer"></span>
+          <button class="btn-create js-stop" onclick="document.getElementById('ov2').classList.add('open')"><span class="plus">+</span> Créer</button>
+        </div>
+        <span class="hint">Clique « + Créer » → fenêtre centrée</span>`
+    },
+    {
+      n:3, title:'Bouton flottant (FAB)', tag:'Mobile-first · pouce',
+      desc:"Un rond « + » flottant en bas à droite qui déploie les 4 actions. Idéal au téléphone, toujours à portée de pouce.",
+      stage:`<div class="fab-zone js-stop">
+          <button class="fab" onclick="this.classList.toggle('open');this.parentNode.classList.toggle('open')"><span class="plus">+</span></button>
+          <div class="fab-actions">
+            ${ACTIONS.map(a=>`<div class="fab-act"><span class="fab-label">${a.label}</span><button class="fab-mini" onclick="pick('${a.label}')" style="color:${toneFg[a.tone]}">${svg(a.icon,18)}</button></div>`).join('')}
+          </div>
+        </div>
+        <span class="hint">Clique le rond « + »</span>`
+    },
+    {
+      n:4, title:'Bouton scindé', tag:'Action rapide + le reste',
+      desc:"« + RDV » crée directement le plus fréquent ; le petit chevron ouvre les autres (Client, Devis, Facture). Un clic pour l'essentiel.",
+      stage:`<div class="minibar">
+          <span class="minibrand">Vitres &amp; Cie</span><span class="minispacer"></span>
+          <div class="split js-stop">
+            <button class="split-main" onclick="pick('Rendez-vous')"><span class="plus" style="font-size:16px">+</span> RDV</button>
+            <button class="split-care" onclick="this.parentNode.querySelector('.menu').classList.toggle('open')">${svg('chevron',15)}</button>
+            <div class="menu">${menuItems()}</div>
+          </div>
+        </div>
+        <span class="hint">« + RDV » direct · chevron = les autres</span>`
+    },
+  ];
+
+  document.getElementById('grid').innerHTML = props.map(p=>`
+    <div class="prop">
+      <div class="prop-head"><span class="prop-num">${p.n}</span><span class="prop-title">${p.title}</span></div>
+      <p class="prop-desc">${p.desc}</p>
+      <span class="prop-tag">${p.tag}</span>
+      <div class="stage">${p.stage}</div>
+    </div>`).join('');
+
+  // overlay pour la proposition 2
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="overlay" id="ov2"><div class="cmd js-stop">
+      <div class="cmd-h">Que veux-tu créer ?</div>
+      <div class="cmd-sub">Choisis un type — ou tape la touche indiquée.</div>
+      <div class="cmd-grid">
+        ${ACTIONS.map(a=>`<button class="cmd-tile" onclick="pick('${a.label}')">
+          <span class="menu-ic" style="background:${toneBg[a.tone]};color:${toneFg[a.tone]}">${svg(a.icon,19)}</span>
+          <span><span class="tl">${a.label}</span><br><span class="ts">${a.desc}</span></span>
+          <span class="cmd-key">${a.kbd}</span>
+        </button>`).join('')}
+      </div>
+    </div></div>
+    <div id="toast" style="position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;font-size:13px;font-weight:600;padding:11px 18px;border-radius:12px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:100;"></div>
+  `);
+  const style=document.createElement('style');
+  style.textContent='#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}';
+  document.head.appendChild(style);
+</script>
+</body>
+</html>

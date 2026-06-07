@@ -1,7 +1,7 @@
 /* Vues : Relances, Rapports, Réglages, Formulaire client */
 
 // ---------- RELANCES AUTOMATIQUES ----------
-function RemindersView({ nav }) {
+function RemindersView({ nav, embedded }) {
   const { reminderRules, reminderLog, clientById } = window.CRM;
   const [rules, setRules] = React.useState(reminderRules);
   const toggle = (id) => {
@@ -16,8 +16,8 @@ function RemindersView({ nav }) {
   const channelMeta = { sms: { icon: "message", label: "SMS" }, email: { icon: "mail", label: "Email" } };
 
   return (
-    <div className="view content-narrow">
-      <SectionTitle title="Relances automatiques" subtitle="Vos rappels partent tout seuls — vous gardez la main." action={<Button icon="plus" onClick={() => nav("ruleNew")}>Nouvelle règle</Button>} />
+    <div className={embedded ? "" : "view content-narrow"}>
+      {!embedded && <SectionTitle title="Relances automatiques" subtitle="Vos rappels partent tout seuls — vous gardez la main." action={<Button icon="plus" onClick={() => nav("ruleNew")}>Nouvelle règle</Button>} />}
 
       <div className="grid" style={{ gridTemplateColumns: "1.3fr 1fr", marginTop: 4 }}>
         <div className="col" style={{ gap: 14 }}>
@@ -54,7 +54,7 @@ function RemindersView({ nav }) {
               />
             )}
             {reminderLog.map((l) => {
-              const c = clientById(l.clientId);
+              const c = clientById(l.clientId) || { id: null, name: "Client supprimé", type: "particulier" };
               return (
                 <div className="log-item" key={l.id}>
                   <span className={`log-ic ${l.channel}`}><Icon name={l.channel === "sms" ? "message" : "mail"} size={14} /></span>
@@ -82,7 +82,7 @@ function ReportsView() {
   // CA par client (top)
   const caByClient = {};
   invoices.forEach((f) => {caByClient[f.clientId] = (caByClient[f.clientId] || 0) + invoiceTotal(f);});
-  const top = Object.entries(caByClient).map(([id, v]) => ({ c: clientById(id), v })).sort((a, b) => b.v - a.v).slice(0, 5);
+  const top = Object.entries(caByClient).map(([id, v]) => ({ c: clientById(id) || { id, name: "Client supprimé", type: "particulier" }, v })).sort((a, b) => b.v - a.v).slice(0, 5);
   const maxTop = Math.max(...top.map((t) => t.v));
 
   const proCount = clients.filter((c) => c.type === "pro").length;
@@ -338,7 +338,7 @@ function SettingsView() {
     setBizSaved(true);
     setTimeout(() => setBizSaved(false), 2200);
   };
-  const sections = [["entreprise", "Entreprise", "briefcase"], ["facturation", "Facturation", "invoices"], ["notifications", "Notifications", "reminders"], ["règles", "Règles", "bolt"], ["apparence", "Apparence", "sparkle"]];
+  const sections = [["entreprise", "Entreprise", "briefcase"], ["facturation", "Facturation", "invoices"], ["notifications", "Notifications", "reminders"], ["règles", "Règles", "bolt"], ["apparence", "Apparence", "sparkle"], ["donnees", "Données de test", "clients"]];
 
   return (
     <div className="view content-narrow">
@@ -417,6 +417,27 @@ function SettingsView() {
               <div className="appearance-hint"><Icon name="sparkle" size={18} /> Thème, police, accent & densité se règlent dans le panneau Tweaks.</div>
             </Card>
           }
+
+          {section === "donnees" &&
+          <Card className="pad">
+              <h3 className="card-h">Données de test</h3>
+              <p className="cc-meta" style={{ marginBottom: 16 }}>
+                Pour essayer l'application, remplissez-la d'un jeu de clients fictifs dans des situations variées (devis en attente, interventions planifiées, factures payées ou en retard, RDV du jour…). À supprimer avant une utilisation réelle.
+              </p>
+              <div className="grid grid-2" style={{ gap: 12 }}>
+                <div style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface-2)" }}>
+                  <div className="t-strong" style={{ fontSize: 13.5 }}>Charger des données de démo</div>
+                  <div className="cc-meta" style={{ marginTop: 4, marginBottom: 12 }}>≈ 24 clients, devis, RDV et factures dans tous les états.</div>
+                  <Button icon="plus" onClick={() => { if (window.confirm("Charger les données de démo ? Cela remplacera vos données actuelles.")) window.CRM.seedDemo(); }}>Charger la démo</Button>
+                </div>
+                <div style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface-2)" }}>
+                  <div className="t-strong" style={{ fontSize: 13.5 }}>Tout réinitialiser</div>
+                  <div className="cc-meta" style={{ marginTop: 4, marginBottom: 12 }}>Efface l'intégralité des données et repart d'une app vierge.</div>
+                  <Button variant="danger" icon="trash" onClick={() => { if (window.confirm("Effacer TOUTES les données ? Cette action est irréversible.")) window.CRM.resetAll(); }}>Tout effacer</Button>
+                </div>
+              </div>
+            </Card>
+          }
         </div>
       </div>
     </div>);
@@ -463,9 +484,9 @@ function ArchivesView({ nav }) {
               <thead><tr><th>Date</th><th>Client</th><th>Prestation</th><th className="num">Montant</th></tr></thead>
               <tbody>
                 {doneAppts.map(a => {
-                  const c = clientById(a.clientId);
+                  const c = clientById(a.clientId) || { id: null, name: "Client supprimé", type: "particulier" };
                   return (
-                    <tr key={a.id} className="clickable" onClick={()=>nav("clientDetail",{id:c.id})}>
+                    <tr key={a.id} className="clickable" onClick={()=> c.id && nav("clientDetail",{id:c.id})}>
                       <td className="t-strong t-mono">{fmtDateFull(a.date)}</td>
                       <td><div className="cell-client"><Avatar name={c.name} type={c.type} clientId={c.id} size={28}/><span className="cc-name">{c.name}</span></div></td>
                       <td className="t-muted">{a.title}<div className="cc-meta">{a.start} – {a.end}</div></td>
@@ -487,7 +508,7 @@ function ArchivesView({ nav }) {
               <thead><tr><th>Référence</th><th>Client</th><th>Date</th><th>Statut</th><th className="num">Montant</th></tr></thead>
               <tbody>
                 {paidInvoices.map(f => {
-                  const c = clientById(f.clientId);
+                  const c = clientById(f.clientId) || { id: null, name: "Client supprimé", type: "particulier" };
                   return (
                     <tr key={f.id}>
                       <td className="t-strong">{f.ref}</td>
@@ -512,7 +533,7 @@ function ArchivesView({ nav }) {
               <thead><tr><th>Référence</th><th>Client</th><th>Date</th><th>Statut</th><th className="num">Montant</th></tr></thead>
               <tbody>
                 {doneQuotes.map(q => {
-                  const c = clientById(q.clientId);
+                  const c = clientById(q.clientId) || { id: null, name: "Client supprimé", type: "particulier" };
                   return (
                     <tr key={q.id}>
                       <td className="t-strong">{q.ref}</td>

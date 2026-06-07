@@ -204,6 +204,8 @@ function DocFormView({ nav, params }) {
   });
   const [note, setNote] = React.useState(() => (params && params.note != null) ? params.note : ((params && params.prefillTitle) ? params.prefillTitle : ""));
   const [validity, setValidity] = React.useState(() => (params && params.validity) ? params.validity : "2026-07-03");
+  // Bug #7 : date du document contrôlée (auparavant ignorée — save forçait today)
+  const [docDate, setDocDate] = React.useState(() => (params && params.date) ? params.date : today);
   // Durée estimée de l'intervention (devis uniquement) — stockée en minutes
   const DUR_PRESETS = [30, 60, 90, 120];
   const initDur = (params && params.durationEstimateMin != null) ? params.durationEstimateMin : 60;
@@ -235,7 +237,7 @@ function DocFormView({ nav, params }) {
       if (src && src.dossierId) dossierId = src.dossierId;
       if (!dossierId) dossierId = newId("dos");
       if (src) src.dossierId = dossierId; // le RDV devis d'origine rejoint le dossier
-      quotes.unshift({ id: newId("q"), ref, clientId, date: today, validUntil: validity, status, items: clean, note, durationEstimateMin: durEstMin, sourceApptId: srcApptId, dossierId });
+      quotes.unshift({ id: newId("q"), ref, clientId, date: docDate, validUntil: validity, status, items: clean, note, durationEstimateMin: durEstMin, sourceApptId: srcApptId, dossierId });
       nav(returnTo || "quotes");
     } else {
       // Lien dossier : facture créée depuis une intervention → récupère appt/devis/dossier
@@ -248,12 +250,16 @@ function DocFormView({ nav, params }) {
         dossierId = ap.dossierId || null;
       }
       if (!dossierId && linkedQuoteId) { const q = quotes.find((q) => q.id === linkedQuoteId); if (q) dossierId = q.dossierId || null; }
-      invoices.unshift({ id: newId("f"), ref, clientId, date: today, dueDate: validity, status, paidDate: null, items: clean, payments: [], linkedApptId, linkedQuoteId, dossierId });
+      invoices.unshift({ id: newId("f"), ref, clientId, date: docDate, dueDate: validity, status, paidDate: null, items: clean, payments: [], linkedApptId, linkedQuoteId, dossierId });
       nav("invoices");
     }
   };
 
   const isDevis = kind === "devis";
+  // Client verrouillé : il est déterminé par la source et ne doit pas pouvoir changer
+  // (devis créé depuis un RDV devis, ou facture créée depuis un devis/une intervention).
+  const clientLocked = !!(params && (params.sourceApptId || params.apptId || params.linkedQuoteId));
+  const lockedClient = clientLocked && clientId ? clientById(clientId) : null;
   // Devis associé à la facture (via l'intervention facturée)
   const linkedQuoteForInvoice = (() => {
     if (kind !== "facture") return null;
@@ -285,6 +291,20 @@ function DocFormView({ nav, params }) {
       <div className="grid" style={{ gridTemplateColumns: "1.6fr 1fr", alignItems: "flex-start" }}>
         <Card className="pad">
           <div className="grid grid-2" style={{ gap: 14, marginBottom: 16 }}>
+            {clientLocked ? (
+              <div className="field" style={{ gridColumn: "1 / -1" }}>
+                <label>Client</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, background: "var(--surface-2)", border: "1px solid var(--line)" }}>
+                  <Avatar name={lockedClient ? lockedClient.name : "?"} type={lockedClient ? lockedClient.type : "particulier"} size={36} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="t-strong" style={{ fontSize: 14 }}>{lockedClient ? lockedClient.name : "—"}</div>
+                    <div className="cc-meta">Déterminé par {isDevis ? "le rendez-vous" : "le devis associé"} — non modifiable</div>
+                  </div>
+                  <Icon name="lock" size={16} className="t-muted" />
+                </div>
+              </div>
+            ) : (
+            <>
             <div className="field" style={{ gridColumn: "1 / -1" }}>
               <label>Type de client</label>
               <div className="pills">
@@ -297,7 +317,9 @@ function DocFormView({ nav, params }) {
               </div>
             </div>
             <div className="field" style={{ gridColumn: "1 / -1" }}><label>Client</label><ClientSelect value={clientId} onChange={(cid) => { setClientId(cid); const c = clientById(cid); if (c) setDocClientType(c.type); }} typeFilter={clientType || null} nav={nav} returnTo={{ view: isDevis ? "quoteNew" : "invoiceNew", params: { kind, clientType, items, note, validity, durationEstimateMin: durEstMin, sourceApptId: params && params.sourceApptId, apptId: params && params.apptId, returnTo } }} /></div>
-            <div className="field"><label>Date</label><input className="input" type="date" defaultValue={today} /></div>
+            </>
+            )}
+            <div className="field"><label>Date</label><input className="input" type="date" value={docDate} onChange={(e) => setDocDate(e.target.value)} /></div>
             <div className="field"><label>{isDevis ? "Valable jusqu'au" : "Échéance"}</label><input className="input" type="date" value={validity} onChange={(e) => setValidity(e.target.value)} /></div>
           </div>
 
@@ -493,25 +515,40 @@ function SlotPicker({ date, setDate, today, start, setStart, spanMin, computedEn
 
 // ---------- FORMULAIRE RENDEZ-VOUS ----------
 function ApptFormView({ nav, params }) {
-  const { appointments, quotes, clientById, quoteTotal, today } = window.CRM;
+  const { appointments, quotes, clientById, quoteTotal, today, newId } = window.CRM;
   const P = params || {};
-  const [rdvType, setRdvType] = React.useState(P.rdvType || "intervention");
-  const [clientId, setApptClientId] = React.useState(P.clientId || "");
+
+  // Bug #1 fix : lecture du RDV existant quand on modifie (editId transmis par ApptDetailView)
+  const editId = P.editId || null;
+  const editing = editId ? appointments.find((a) => a.id === editId) : null;
+
+  const [rdvType, setRdvType] = React.useState(editing ? editing.rdvType : (P.rdvType || "intervention"));
+  const [clientId, setApptClientId] = React.useState(editing ? editing.clientId : (P.clientId || ""));
   const [clientType, setApptClientType] = React.useState(() => {
+    const src = editing || P;
+    if (editing && editing.clientId) { const c = clientById(editing.clientId); if (c) return c.type; }
     if (P.clientType) return P.clientType;
     if (P.clientId) { const c = clientById(P.clientId); if (c) return c.type; }
     return "";
   });
-  const [linkedQuoteId, setLinkedQuoteId] = React.useState(P.quoteId || P.linkedQuoteId || "");
-  const [price, setPrice] = React.useState(P.price != null && P.price !== "" ? String(P.price) : "");
-  const [title, setTitle] = React.useState(P.title || "");
-  const [date, setDate] = React.useState(P.date || today);
-  const [start, setStart] = React.useState(P.start || "09:00");
-  const [duration, setDuration] = React.useState(P.duration || 5);   // appel / devis (minutes)
-  const [durMin, setDurMin] = React.useState(P.durMin || 60);         // intervention / autre (minutes)
-  const [customMode, setCustomMode] = React.useState(() => !!(P.durMin && ![15, 30, 60].includes(P.durMin)));
-  const [customStr, setCustomStr] = React.useState(() => (P.durMin && ![15, 30, 60].includes(P.durMin)) ? `${Math.floor(P.durMin / 60)}:${String(P.durMin % 60).padStart(2, '0')}` : "");
-  const [recurring, setRecurring] = React.useState(P.recurring || "");
+  const [linkedQuoteId, setLinkedQuoteId] = React.useState(editing ? (editing.linkedQuoteId || "") : (P.quoteId || P.linkedQuoteId || ""));
+  const [price, setPrice] = React.useState(editing ? String(editing.price ?? "") : (P.price != null && P.price !== "" ? String(P.price) : ""));
+  const [title, setTitle] = React.useState(editing ? editing.title : (P.title || ""));
+  const [date, setDate] = React.useState(editing ? editing.date : (P.date || today));
+  const [start, setStart] = React.useState(editing ? editing.start : (P.start || "09:00"));
+  // durée en minutes depuis end-start existant
+  const initDurMin = (() => {
+    if (editing) {
+      const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+      return Math.max(15, toMin(editing.end) - toMin(editing.start));
+    }
+    return P.durMin || 60;
+  })();
+  const [duration, setDuration] = React.useState(editing ? initDurMin : (P.duration || 5));
+  const [durMin, setDurMin] = React.useState(initDurMin);
+  const [customMode, setCustomMode] = React.useState(() => !!(initDurMin && ![15, 30, 60].includes(initDurMin)));
+  const [customStr, setCustomStr] = React.useState(() => (initDurMin && ![15, 30, 60].includes(initDurMin)) ? `${Math.floor(initDurMin / 60)}:${String(initDurMin % 60).padStart(2, "0")}` : "");
+  const [recurring, setRecurring] = React.useState(editing ? (editing.recurring || "") : (P.recurring || ""));
   const [slotPicked, setSlotPicked] = React.useState(!!P.slotPicked);
   const [saveError, setSaveError] = React.useState(null);
 
@@ -593,7 +630,8 @@ function ApptFormView({ nav, params }) {
     const gap = window.getMinGap ? window.getMinGap() : 10;
     const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
     const sMin = toMin(start), eMin = toMin(computedEnd);
-    const conflict = appointments.find((a) => a.date === date && a.status !== 'annule' && (eMin + gap > toMin(a.start)) && (sMin < toMin(a.end) + gap));
+    // En mode édition, on exclut le RDV lui-même de la détection de conflit
+    const conflict = appointments.find((a) => a.date === date && a.status !== 'annule' && a.id !== (editing && editing.id) && (eMin + gap > toMin(a.start)) && (sMin < toMin(a.end) + gap));
     if (conflict) {
       const overlap = (toMin(conflict.start) < eMin) && (toMin(conflict.end) > sMin);
       setSaveError(overlap
@@ -602,17 +640,35 @@ function ApptFormView({ nav, params }) {
       return;
     }
     const effLinkedQuoteId = (rdvType === 'intervention' && linkedQuoteId) ? linkedQuoteId : null;
-    // Lien dossier : l'intervention hérite du dossierId du devis lié
-    let dossierId = null;
-    if (effLinkedQuoteId) { const q = quotes.find((q) => q.id === effLinkedQuoteId); if (q) dossierId = q.dossierId || null; }
-    appointments.push({ id: newId('a'), clientId, date, start, end: computedEnd, title, rdvType, linkedQuoteId: effLinkedQuoteId, dossierId, status: 'planifie', price: (rdvType === 'appel' || rdvType === 'devis') ? 0 : Number(price) || 0, recurring: recurring || null });
-    nav(returnTo);
+    let dossierId = editing ? editing.dossierId : null;
+    if (effLinkedQuoteId) { const q = quotes.find((q) => q.id === effLinkedQuoteId); if (q) dossierId = q.dossierId || dossierId; }
+    if (editing) {
+      // Mise à jour en place — pas de doublon
+      Object.assign(editing, { clientId, date, start, end: computedEnd, title, rdvType, linkedQuoteId: effLinkedQuoteId, dossierId, price: (rdvType === 'appel' || rdvType === 'devis') ? 0 : Number(price) || 0, recurring: recurring || null });
+      if (window.CRM.save) window.CRM.save();
+      nav(returnTo);
+    } else {
+      const isRecur = rdvType === 'intervention' && !!recurring;
+      const seriesId = isRecur ? newId('ser') : null;
+      const basePrice = (rdvType === 'appel' || rdvType === 'devis') ? 0 : Number(price) || 0;
+      const base = { id: newId('a'), clientId, date, start, end: computedEnd, title, rdvType, linkedQuoteId: effLinkedQuoteId, dossierId, status: 'planifie', price: basePrice, recurring: recurring || null, seriesId };
+      appointments.push(base);
+      // Bug #8 : génération des occurrences récurrentes (3 mois, min. 3 occurrences),
+      // en respectant la règle de validation (créneau en conflit → sauté).
+      let skipped = 0;
+      if (isRecur && window.CRM.generateSeries) {
+        const r = window.CRM.generateSeries(base, recurring, seriesId, gap);
+        skipped = r.skipped;
+      }
+      if (window.CRM.save) window.CRM.save();
+      nav(returnTo);
+    }
   };
 
   return (
     <div className="view content-narrow">
       <button className="back-link" onClick={() => nav(returnTo)}><Icon name="chevronLeft" size={16} /> {returnTo === "maJournee" ? "Ma journée" : "Agenda"}</button>
-      <SectionTitle title="Nouveau rendez-vous" />
+      <SectionTitle title={editing ? "Modifier le rendez-vous" : "Nouveau rendez-vous"} />
 
       {/* Type — centré, hors carte */}
       <div style={{ display: "flex", justifyContent: "center", margin: "18px 0" }}>
@@ -807,17 +863,15 @@ function ApptDetailView({ nav, params }) {
 
   const c = clientById(a.clientId);
   const linkedQ = a.linkedQuoteId ? quotes.find((q) => q.id === a.linkedQuoteId) : null;
-  // Facture liée : priorité aux liens fiables (linkedApptId → dossierId → linkedQuoteId),
-  // repli client + date uniquement pour les anciennes données sans liens.
+  // Facture liée — détection 100 % par liens fiables (linkedApptId → dossierId → linkedQuoteId).
+  // Plus de repli « client + date » : il provoquait de faux positifs (ex. une facture manuelle
+  // du même client rattachée par hasard). Cohérent avec apptHasInvoice / aFact.
   const relatedInv = (() => {
     const byAppt = invoices.find((f) => f.linkedApptId === a.id);
     if (byAppt) return byAppt;
     if (a.dossierId) { const byDos = invoices.find((f) => f.dossierId === a.dossierId); if (byDos) return byDos; }
     if (a.linkedQuoteId) { const byQuote = invoices.find((f) => f.linkedQuoteId === a.linkedQuoteId); if (byQuote) return byQuote; }
-    // Repli legacy : aucune facture porteuse de lien → on évite de rattacher par hasard
-    const hasAnyLink = invoices.some((f) => f.linkedApptId || f.linkedQuoteId || f.dossierId);
-    if (hasAnyLink) return null;
-    return invoices.filter((f) => f.clientId === a.clientId && f.date >= a.date).sort((x, y) => y.date.localeCompare(x.date))[0] || null;
+    return null;
   })();
   const [status, setStatus] = React.useState(a.status);
   const COLORS = { planifie: "var(--water)", termine: "var(--success)", annule: "var(--danger)" };
@@ -835,7 +889,7 @@ function ApptDetailView({ nav, params }) {
         <div className="apdt-dot" style={{ background: COLORS[status] || "var(--accent)" }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
-            <h1 style={{ fontSize: 22 }}>{c.name}</h1>
+            <h1 style={{ fontSize: 22 }}>{c ? c.name : a.title}</h1>
             <Badge status={status} />
             {a.rdvType && <Badge tone="neutral">{RDV_TYPE_LABEL[a.rdvType] || a.rdvType}</Badge>}
           </div>
@@ -856,12 +910,16 @@ function ApptDetailView({ nav, params }) {
         {/* Infos client */}
         <Card className="pad">
           <h3 className="card-h">Client</h3>
+          {c ? (
           <dl className="deflist">
             <div><dt>Nom</dt><dd><button className="apdt-link" onClick={() => nav("clientDetail", { id: c.id })}>{c.name} <Icon name="arrowUpRight" size={13} /></button></dd></div>
             <div><dt>Téléphone</dt><dd><a href={"tel:" + c.phone} className="apdt-link">{c.phone}</a></dd></div>
             <div><dt>Adresse</dt><dd>{c.address}</dd></div>
             {c.notes && <div><dt>Notes</dt><dd style={{ color: "var(--ink-2)", fontStyle: "italic" }}>{c.notes}</dd></div>}
           </dl>
+          ) : (
+          <p className="cc-meta" style={{ marginTop: 6 }}>Aucun client associé à ce rendez-vous.</p>
+          )}
         </Card>
 
         {/* Prestation */}
@@ -906,6 +964,39 @@ function ApptDetailView({ nav, params }) {
           </div>
         </Card>
       }
+
+      {/* Série récurrente — gestion (Bug #8) */}
+      {a.seriesId && a.recurring && (() => {
+        const members = appointments.filter((x) => x.seriesId === a.seriesId);
+        const upcoming = members.filter((x) => x.status === "planifie" && x.date >= today).sort((x, y) => x.date.localeCompare(y.date));
+        const lastDate = members.reduce((mx, x) => (x.date > mx ? x.date : mx), members[0].date);
+        return (
+          <Card className="pad" style={{ marginTop: 16, borderColor: "var(--water)" }}>
+            <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+              <div>
+                <h3 className="card-h" style={{ marginBottom: 4 }}>Série récurrente · {a.recurring}</h3>
+                <div className="cc-meta">{members.length} rendez-vous · {upcoming.length} à venir · jusqu'au {fmtDate(lastDate, true)}</div>
+              </div>
+              <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                <Button variant="outline" size="sm" icon="calendar" onClick={() => {
+                  const r = window.CRM.extendSeries(a.seriesId, a.recurring, window.getMinGap ? window.getMinGap() : 10, 3);
+                  window.alert(r.created > 0 ? `${r.created} rendez-vous ajoutés à la série.${r.skipped ? ` (${r.skipped} créneau(x) occupé(s) sauté(s))` : ""}` : "Aucun nouveau rendez-vous à ajouter.");
+                  nav("apptDetail", { id: a.id });
+                }}>Prolonger (+3 mois)</Button>
+                {upcoming.length > 0 &&
+                  <Button variant="ghost" size="sm" icon="trash" onClick={() => {
+                    if (window.confirm(`Supprimer les ${upcoming.length} rendez-vous à venir de cette série ? Les rendez-vous passés et terminés sont conservés.`)) {
+                      const fromDate = a.date > today ? a.date : today;
+                      const removed = window.CRM.deleteFutureSeries(a.seriesId, fromDate);
+                      nav("appointments");
+                    }
+                  }}>Supprimer les RDV à venir</Button>
+                }
+              </div>
+            </div>
+          </Card>
+        );
+      })()}
 
       {/* Actions */}
       {(status === "termine" || status === "annule") &&
